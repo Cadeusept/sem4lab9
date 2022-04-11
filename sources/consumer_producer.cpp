@@ -2,7 +2,7 @@
 
 #include <stdexcept>
 
-#include <example.hpp>
+#include <consumer_producer.hpp>
 
 auto example() -> void {
   throw std::runtime_error("not implemented");

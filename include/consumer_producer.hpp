@@ -3,6 +3,8 @@
 #ifndef INCLUDE_EXAMPLE_HPP_
 #define INCLUDE_EXAMPLE_HPP_
 
-auto example() -> void;
+void consumer_func() {
+
+}
 
 #endif // INCLUDE_EXAMPLE_HPP_
