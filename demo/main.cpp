@@ -9,6 +9,6 @@
 #include <string>
 #include <thread>
 
-int main() {
-  example();
+int main(int argc, char* argv[]) {
+
 }
