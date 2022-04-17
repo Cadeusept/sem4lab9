@@ -15,7 +15,7 @@
 #include <boost/asio/ssl/stream.hpp>
 #include <boost/asio/ssl.hpp>
 #include <boost/program_options.hpp>
-//#include <openssl/ssl.h>
+#include <queue>
 #include <iomanip>
 #include <iostream>
 #include <memory>
@@ -64,20 +64,22 @@ struct BodyStruct {
     }
 };
 
-[[maybe_unused]] void downloader_fun(std::vector<LinkStruct>& vLinks,
-                         std::vector<BodyStruct>& vBody,
+[[maybe_unused]] void downloader_fun(std::queue<LinkStruct>& vLinks,
+                         std::queue<BodyStruct>& vBody,
                          const std::shared_ptr<std::timed_mutex>&
                              link_v_mutex,
                          const std::shared_ptr<std::timed_mutex>&
-                             body_v_mutex);
+                             body_v_mutex,
+                         short& downloaded_num);
 
-[[maybe_unused]] void parser_fun(std::vector<LinkStruct>& vLinks,
-                         std::vector<BodyStruct>& vBody,
+[[maybe_unused]] void parser_fun(std::queue<LinkStruct>& vLinks,
+                         std::queue<BodyStruct>& vBody,
                          const std::shared_ptr<std::timed_mutex>&
                              link_v_mutex,
                          const std::shared_ptr<std::timed_mutex>&
                              body_v_mutex,
                          const std::shared_ptr<std::timed_mutex>& file_mutex,
+                         short& parsed_num,
                          std::ofstream& fout);
 
 #endif // INCLUDE_EXAMPLE_HPP_

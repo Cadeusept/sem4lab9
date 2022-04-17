@@ -1,14 +1,7 @@
-#include <boost/asio/ip/tcp.hpp>
-#include <boost/beast/core.hpp>
-#include <boost/beast/http.hpp>
-#include <boost/beast/version.hpp>
-#include <boost/config.hpp>
 #include <boost/program_options.hpp>
-#include <iomanip>
 #include <iostream>
 #include <memory>
 #include <string>
-#include <thread>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include "../third-party/ThreadPool/ThreadPool.h"
 
@@ -46,13 +39,13 @@ int main(int argc, char* argv[]) {
     ThreadPool downloaders(vm["network_threads"].as<int>());
     ThreadPool parsers(vm["parser_threads"].as<int>());
 
-    std::vector<LinkStruct> vLinks;
+    std::queue<LinkStruct> vLinks;
 
-    std::vector<BodyStruct> vBody;
+    std::queue<BodyStruct> vBody;
 
     LinkStruct head_link(vm["url"].as<std::string>(), vm["depth"].as<int>());
 
-    vLinks.push_back(LinkStruct(vm["url"].as<std::string>(),
+    vLinks.push(LinkStruct(vm["url"].as<std::string>(),
                                 vm["depth"].as<int>()));
 
     std::shared_ptr<std::timed_mutex> link_v_mutex =
@@ -65,20 +58,30 @@ int main(int argc, char* argv[]) {
     std::ofstream fout;
     fout.open(vm["output"].as<std::string>());
 
-    boost::posix_time::ptime begin_time = boost::posix_time::microsec_clock::local_time();
+    boost::posix_time::ptime begin_time =
+        boost::posix_time::microsec_clock::local_time();
 
-    while (!(vLinks.empty() && vBody.empty())) {
+    short downloaded_num = 0;
+    short parsed_num = 0;
+
+    std::cout << "Began working" << std::endl;
+
+    while (!(vLinks.empty() && vBody.empty() &&
+           (downloaded_num - parsed_num == 0))) {
         downloaders.enqueue([&vLinks, &vBody, &link_v_mutex, &body_v_mutex,
-          &file_mutex, &fout] {
-            downloader_fun(vLinks, vBody, link_v_mutex, body_v_mutex);
+                           &downloaded_num] {
+            downloader_fun(vLinks, vBody, link_v_mutex, body_v_mutex,
+                       downloaded_num);
         });
 
         parsers.enqueue([&vLinks, &vBody, &link_v_mutex, &body_v_mutex,
-          &file_mutex, &fout] {
+          &file_mutex, &parsed_num, &fout] {
             parser_fun(vLinks, vBody, link_v_mutex, body_v_mutex, file_mutex,
-                     fout);
+                     parsed_num, fout);
         });
     }
+
+    fout.close();
 
     std::cout << "Execution time: "
               << boost::posix_time::microsec_clock::local_time() - begin_time

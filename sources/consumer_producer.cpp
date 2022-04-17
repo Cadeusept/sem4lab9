@@ -9,17 +9,20 @@ namespace ssl = boost::asio::ssl;       // from <boost/asio/ssl.hpp>
 namespace http = boost::beast::http;    // from <boost/beast/http.hpp>
 
 // Performs an HTTP GET and prints the response
-[[maybe_unused]] void downloader_fun(std::vector<LinkStruct>& vLinks,
-                         std::vector<BodyStruct>& vBody,
+[[maybe_unused]] void downloader_fun(std::queue<LinkStruct>& vLinks,
+                         std::queue<BodyStruct>& vBody,
                          const std::shared_ptr<std::timed_mutex>&
                              link_v_mutex,
                          const std::shared_ptr<std::timed_mutex>&
-                             body_v_mutex)
+                             body_v_mutex,
+                         short& downloaded_num)
 {
     std::cout << "Downloader started to work" << std::endl;
+    downloaded_num++;
+
     link_v_mutex->lock();
     LinkStruct input = vLinks.front();
-    vLinks.pop_back();
+    vLinks.pop();
     link_v_mutex->unlock();
 
     std::string url = input.get_url();
@@ -30,18 +33,17 @@ namespace http = boost::beast::http;    // from <boost/beast/http.hpp>
     {
         auto port = "80";
         const int version = 11; //http version
-        std::string tmp;
 
         if (url.find("https://")) {
             port = "443";
-            tmp = url.substr(8, url.length());
+            url = url.substr(8, url.length());
         } else if (url.find("http://")) {
-            port = "80";
-            tmp = url.substr(7, url.length());
+            //port = "80";
+            url = url.substr(7, url.length());
         } else
             throw std::runtime_error("Wrong url");
-        auto const host = tmp.substr(0, url.find('/'));
-        auto const target = tmp.substr(url.find('/'), url.length());
+        auto const host = url.substr(0, url.find('/'));
+        auto const target = url.substr(url.find('/'), url.length());
 
         // The io_context is required for all I/O
         boost::asio::io_context ioc;
@@ -110,8 +112,9 @@ namespace http = boost::beast::http;    // from <boost/beast/http.hpp>
     }
 
     body_v_mutex->lock();
-    vBody.emplace_back(ss.str(), depth);
+    vBody.push(BodyStruct(ss.str(), depth));
     body_v_mutex->unlock();
+    std::cout << "Downloader finished working" << std::endl;
 }
 
 
@@ -120,19 +123,20 @@ namespace http = boost::beast::http;    // from <boost/beast/http.hpp>
 
 
 
-[[maybe_unused]] void parser_fun(std::vector<LinkStruct>& vLinks,
-                         std::vector<BodyStruct>& vBody,
+[[maybe_unused]] void parser_fun(std::queue<LinkStruct>& vLinks,
+                         std::queue<BodyStruct>& vBody,
                          const std::shared_ptr<std::timed_mutex>&
                              link_v_mutex,
                          const std::shared_ptr<std::timed_mutex>&
                              body_v_mutex,
                          const std::shared_ptr<std::timed_mutex>& file_mutex,
+                         short& parsed_num,
                          std::ofstream& fout) {
     std::cout << "Parser started to work" << std::endl;
 
     body_v_mutex->lock();
     BodyStruct input = vBody.front();
-    vBody.pop_back();
+    vBody.pop();
     body_v_mutex->unlock();
 
     std::string htmlSource = input.get_body();
@@ -156,7 +160,7 @@ namespace http = boost::beast::http;    // from <boost/beast/http.hpp>
                     gumbo_get_attribute(&node->v.element.attributes, "href"))) {
 
                 link_v_mutex->lock();
-                vLinks.emplace_back(LinkStruct(
+                vLinks.push(LinkStruct(
                     href->value, depth - 1));  // пихнуть ссылку в стек
                 link_v_mutex->unlock();
             } else
@@ -177,4 +181,6 @@ namespace http = boost::beast::http;    // from <boost/beast/http.hpp>
     }
 
     gumbo_destroy_output(&kGumboDefaultOptions, parsedBody);
+    parsed_num++;
+    std::cout << "Parser finished working" << std::endl;
 }
