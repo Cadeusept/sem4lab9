@@ -66,19 +66,23 @@ int main(int argc, char* argv[]) {
 
     std::cout << "Began working" << std::endl;
 
-    while (!(vLinks.empty() && vBody.empty() &&
-           (downloaded_num - parsed_num == 0))) {
+    while (1) {
+        if ( downloaded_num == 0)
         downloaders.enqueue([&vLinks, &vBody, &link_v_mutex, &body_v_mutex,
                            &downloaded_num] {
             downloader_fun(vLinks, vBody, link_v_mutex, body_v_mutex,
                        downloaded_num);
         });
 
+        if (parsed_num < downloaded_num && !vBody.empty())
         parsers.enqueue([&vLinks, &vBody, &link_v_mutex, &body_v_mutex,
           &file_mutex, &parsed_num, &fout] {
             parser_fun(vLinks, vBody, link_v_mutex, body_v_mutex, file_mutex,
                      parsed_num, fout);
         });
+
+        if (vLinks.empty() && vBody.empty() &&
+           (downloaded_num - parsed_num == 0)) break;
     }
 
     fout.close();

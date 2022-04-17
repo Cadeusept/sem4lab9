@@ -18,7 +18,6 @@ namespace http = boost::beast::http;    // from <boost/beast/http.hpp>
                          short& downloaded_num)
 {
     std::cout << "Downloader started to work" << std::endl;
-    downloaded_num++;
 
     link_v_mutex->lock();
     LinkStruct input = vLinks.front();
@@ -28,7 +27,7 @@ namespace http = boost::beast::http;    // from <boost/beast/http.hpp>
     std::string url = input.get_url();
     int depth = input.get_depth();
 
-    std::stringstream ss;
+    std::string output;
     try
     {
         //auto port = "80";
@@ -47,45 +46,8 @@ namespace http = boost::beast::http;    // from <boost/beast/http.hpp>
 
         //std::cout << host << " " << port << " " << target << " " << version << std::endl;
 
-        boost::asio::io_context ioc{};
-        ssl::context ctx(ssl::context::tls_client);
-        load_root_certificates(ctx);
-
-        tcp::resolver resolver(ioc);
-        boost::beast::ssl_stream<boost::beast::tcp_stream> stream(ioc, ctx);
-
-        if (!SSL_set_tlsext_host_name(stream.native_handle(), host.data())) {
-        boost::beast::error_code ec{static_cast<int>(::ERR_get_error()),
-        boost::asio::error::get_ssl_category()};
-        throw boost::beast::system_error{ec};
-        }
-
         //port = "443";
         //version = 11;
-        auto const results = resolver.resolve(host, "443");
-
-        boost::beast::get_lowest_layer(stream).connect(results);
-
-        stream.handshake(ssl::stream_base::client);
-
-        http::request<boost::beast::http::string_body> req{
-        http::verb::get, target, 11};
-        req.set(http::field::host, host);
-        req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
-
-        http::write(stream, req);
-
-        boost::beast::flat_buffer buffer;
-        boost::beast::http::response<boost::beast::http::string_body> res;
-
-        http::read(stream, buffer, res);
-
-        boost::beast::error_code ec;
-        stream.shutdown(ec);
-
-/*        return res.body();
-    }
-
         boost::asio::io_context ioc;
         ssl::context ctx{ ssl::context::sslv23_client };
         load_root_certificates(ctx);
@@ -97,26 +59,25 @@ namespace http = boost::beast::http;    // from <boost/beast/http.hpp>
             throw boost::system::system_error{ ec };
         }
 
-        auto const results = resolver.resolve(host, port);
+        auto const results = resolver.resolve(host, "443");
         boost::asio::connect(stream.next_layer(), results.begin(), results.end());
         stream.handshake(ssl::stream_base::client);
 
-        http::request<http::string_body> req{ http::verb::get, target, version };
-        req.set(http::field::host, host);
+        http::request<http::string_body> req{ http::verb::get, target, 11}; //11
+        req.set(http::field::host, "443");
         req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
 
         http::write(stream, req);
         boost::beast::flat_buffer buffer;
-        http::response<http::dynamic_body> res;
+        http::response<boost::beast::http::string_body> res;
 
         http::read(stream, buffer, res);
 
 
         boost::system::error_code ec;
-        stream.shutdown(ec); */
+        stream.shutdown(ec);
 
-        // запись html-страницы в поток вывода
-        ss << res.body();
+        output = res.body();
         if (ec == boost::asio::error::eof)
         {
             ec.assign(0, ec.category());
@@ -130,11 +91,11 @@ namespace http = boost::beast::http;    // from <boost/beast/http.hpp>
     {
         std::cerr << "Error: " << e.what() << std::endl;
     }
-
     body_v_mutex->lock();
-    vBody.push(BodyStruct(ss.str(), depth));
+    vBody.push(BodyStruct(output, depth)); // запись html-страницы в поток вывода
     body_v_mutex->unlock();
     std::cout << "Downloader finished working" << std::endl;
+    downloaded_num++;
 }
 
 
