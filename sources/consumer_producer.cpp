@@ -31,72 +31,92 @@ namespace http = boost::beast::http;    // from <boost/beast/http.hpp>
     std::stringstream ss;
     try
     {
-        auto port = "80";
-        const int version = 11; //http version
+        //auto port = "80";
+        //const int version = 11; //http version
 
         if (url.find("https://")) {
-            port = "443";
-            url = url.substr(8, url.length());
+            //port = "443";
+            url = url.substr(9, url.length());
         } else if (url.find("http://")) {
             //port = "80";
-            url = url.substr(7, url.length());
+            url = url.substr(8, url.length());
         } else
             throw std::runtime_error("Wrong url");
         auto const host = url.substr(0, url.find('/'));
         auto const target = url.substr(url.find('/'), url.length());
 
-        // The io_context is required for all I/O
-        boost::asio::io_context ioc;
+        //std::cout << host << " " << port << " " << target << " " << version << std::endl;
 
-        // The SSL context is required, and holds certificates
-        ssl::context ctx{ ssl::context::sslv23_client };
-
-        // This holds the root certificate used for verification
+        boost::asio::io_context ioc{};
+        ssl::context ctx(ssl::context::tls_client);
         load_root_certificates(ctx);
 
-        // These objects perform our I/O
+        tcp::resolver resolver(ioc);
+        boost::beast::ssl_stream<boost::beast::tcp_stream> stream(ioc, ctx);
+
+        if (!SSL_set_tlsext_host_name(stream.native_handle(), host.data())) {
+        boost::beast::error_code ec{static_cast<int>(::ERR_get_error()),
+        boost::asio::error::get_ssl_category()};
+        throw boost::beast::system_error{ec};
+        }
+
+        //port = "443";
+        //version = 11;
+        auto const results = resolver.resolve(host, "443");
+
+        boost::beast::get_lowest_layer(stream).connect(results);
+
+        stream.handshake(ssl::stream_base::client);
+
+        http::request<boost::beast::http::string_body> req{
+        http::verb::get, target, 11};
+        req.set(http::field::host, host);
+        req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
+
+        http::write(stream, req);
+
+        boost::beast::flat_buffer buffer;
+        boost::beast::http::response<boost::beast::http::string_body> res;
+
+        http::read(stream, buffer, res);
+
+        boost::beast::error_code ec;
+        stream.shutdown(ec);
+
+/*        return res.body();
+    }
+
+        boost::asio::io_context ioc;
+        ssl::context ctx{ ssl::context::sslv23_client };
+        load_root_certificates(ctx);
         tcp::resolver resolver{ ioc };
         ssl::stream<tcp::socket> stream{ ioc, ctx };
-
-        // Set SNI Hostname (many hosts need this to handshake successfully)
         if (!SSL_set_tlsext_host_name(stream.native_handle(), host.c_str()))
         {
             boost::system::error_code ec{ static_cast<int>(::ERR_get_error()), boost::asio::error::get_ssl_category() };
             throw boost::system::system_error{ ec };
         }
 
-        // Look up the domain name
         auto const results = resolver.resolve(host, port);
-
-        // Make the connection on the IP address we get from a lookup
         boost::asio::connect(stream.next_layer(), results.begin(), results.end());
-
-        // Perform the SSL handshake
         stream.handshake(ssl::stream_base::client);
 
-        // Set up an HTTP GET request message
         http::request<http::string_body> req{ http::verb::get, target, version };
         req.set(http::field::host, host);
         req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
 
-        // Send the HTTP request to the remote host
         http::write(stream, req);
-
-        // This buffer is used for reading and must be persisted
         boost::beast::flat_buffer buffer;
-
-        // Declare a container to hold the response
         http::response<http::dynamic_body> res;
 
-        // Receive the HTTP response, html-page in "res"
         http::read(stream, buffer, res);
 
-        // запись html-страницы в поток вывода
-        ss << res;
 
-        // Gracefully close the stream
         boost::system::error_code ec;
-        stream.shutdown(ec);
+        stream.shutdown(ec); */
+
+        // запись html-страницы в поток вывода
+        ss << res.body();
         if (ec == boost::asio::error::eof)
         {
             ec.assign(0, ec.category());

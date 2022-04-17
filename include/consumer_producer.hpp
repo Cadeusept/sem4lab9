@@ -3,7 +3,7 @@
 #ifndef INCLUDE_EXAMPLE_HPP_
 #define INCLUDE_EXAMPLE_HPP_
 
-#include "/usr/include/boost/beast/example/common/root_certificates.hpp"
+#include "../third-party/root_certificates.hpp"
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
