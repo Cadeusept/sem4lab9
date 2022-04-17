@@ -34,6 +34,9 @@ find_package(GTest CONFIG REQUIRED)
 hunter_add_package(Beast)
 find_package(Beast CONFIG REQUIRED)
 
+hunter_add_package(OpenSSL)
+find_package(OpenSSL CONFIG REQUIRED)
+
 hunter_add_package(Boost COMPONENTS system program_options)
 find_package(Boost CONFIG REQUIRED system program_options)
 
@@ -59,6 +62,8 @@ target_link_libraries(${PROJECT_NAME}
         Boost::program_options
         Beast::Beast
         gumbo::gumbo
+        OpenSSL::SSL
+        OpenSSL::Crypto
         )
 
 target_link_libraries(demo ${PROJECT_NAME})

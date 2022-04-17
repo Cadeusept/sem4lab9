@@ -12,7 +12,11 @@
 #include <gumbo.h>
 #include "../third-party/ThreadPool/ThreadPool.h"
 
+#include "consumer_producer.hpp"
+
 namespace po = boost::program_options;
+
+std::vector<LinkStruct> vLinks;
 
 int main(int argc, char* argv[]) {
     po::options_description opt_desc("Needed options");
@@ -43,6 +47,10 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
+    LinkStruct head_link(vm["url"].as<std::string>(), vm["depth"].as<int>());
+
+    vLinks.push_back(vm["url"].as<std::string>());
 
 
+    return 0;
 }
