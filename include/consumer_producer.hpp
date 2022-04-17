@@ -35,10 +35,49 @@ struct LinkStruct {
         _url = std::move(url);
         _depth = std::move(depth);
     }
+
+    std::string get_url() {
+        return _url;
+    }
+
+    int get_depth() {
+        return _depth;
+    }
 };
 
-std::stringstream consumer_fun(std::string url);
+struct BodyStruct {
+ private:
+    std::string _body;
+    int _depth;
+ public:
+    BodyStruct(std::string url, int depth) {
+        _body = std::move(url);
+        _depth = std::move(depth);
+    }
 
-static void producer_fun(GumboNode* node, const int depth);
+    std::string get_body() {
+        return _body;
+    }
+
+    int get_depth() {
+        return _depth;
+    }
+};
+
+[[maybe_unused]] void downloader_fun(std::vector<LinkStruct>& vLinks,
+                         std::vector<BodyStruct>& vBody,
+                         const std::shared_ptr<std::timed_mutex>&
+                             link_v_mutex,
+                         const std::shared_ptr<std::timed_mutex>&
+                             body_v_mutex);
+
+[[maybe_unused]] void parser_fun(std::vector<LinkStruct>& vLinks,
+                         std::vector<BodyStruct>& vBody,
+                         const std::shared_ptr<std::timed_mutex>&
+                             link_v_mutex,
+                         const std::shared_ptr<std::timed_mutex>&
+                             body_v_mutex,
+                         const std::shared_ptr<std::timed_mutex>& file_mutex,
+                         std::ofstream& fout);
 
 #endif // INCLUDE_EXAMPLE_HPP_

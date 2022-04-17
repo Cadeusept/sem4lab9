@@ -9,21 +9,29 @@ namespace ssl = boost::asio::ssl;       // from <boost/asio/ssl.hpp>
 namespace http = boost::beast::http;    // from <boost/beast/http.hpp>
 
 // Performs an HTTP GET and prints the response
-std::stringstream consumer_fun(const std::string url)
+[[maybe_unused]] void downloader_fun(std::vector<LinkStruct>& vLinks,
+                         std::vector<BodyStruct>& vBody,
+                         const std::shared_ptr<std::timed_mutex>&
+                             link_v_mutex,
+                         const std::shared_ptr<std::timed_mutex>&
+                             body_v_mutex)
 {
+    std::cout << "Downloader started to work" << std::endl;
+    link_v_mutex->lock();
+    LinkStruct input = vLinks.front();
+    vLinks.pop_back();
+    link_v_mutex->unlock();
+
+    std::string url = input.get_url();
+    int depth = input.get_depth();
+
     std::stringstream ss;
     try
     {
-        "Usage: http-client-sync-ssl <host> <port> <target> [<HTTP version: 1.0 or 1.1(default)>]\n"
-        "Example:\n"
-        "    http-client-sync-ssl www.example.com 443 /\n"
-        "    http-client-sync-ssl www.example.com 443 / 1.0\n";
-
         auto port = "80";
         const int version = 11; //http version
         std::string tmp;
 
-        // адрес страницы для скачивания: https://www.boost.org/doc/libs/1_69_0/libs/beast/example/http/client/sync-ssl/http_client_sync_ssl.cpp
         if (url.find("https://")) {
             port = "443";
             tmp = url.substr(8, url.length());
@@ -43,9 +51,6 @@ std::stringstream consumer_fun(const std::string url)
 
         // This holds the root certificate used for verification
         load_root_certificates(ctx);
-
-        // Verify the remote server's certificate
-        //ctx.set_verify_mode(ssl::verify_peer);
 
         // These objects perform our I/O
         tcp::resolver resolver{ ioc };
@@ -92,8 +97,6 @@ std::stringstream consumer_fun(const std::string url)
         stream.shutdown(ec);
         if (ec == boost::asio::error::eof)
         {
-            // Rationale:
-            // http://stackoverflow.com/questions/25587403/boost-asio-ssl-async-shutdown-always-finishes-with-an-error
             ec.assign(0, ec.category());
         }
         if (ec)
@@ -105,7 +108,10 @@ std::stringstream consumer_fun(const std::string url)
     {
         std::cerr << "Error: " << e.what() << std::endl;
     }
-    return ss;
+
+    body_v_mutex->lock();
+    vBody.emplace_back(ss.str(), depth);
+    body_v_mutex->unlock();
 }
 
 
@@ -114,9 +120,23 @@ std::stringstream consumer_fun(const std::string url)
 
 
 
-static void producer_fun(const std::string htmlSource, const int depth) {
-    if (depth == 0)
-        return;
+[[maybe_unused]] void parser_fun(std::vector<LinkStruct>& vLinks,
+                         std::vector<BodyStruct>& vBody,
+                         const std::shared_ptr<std::timed_mutex>&
+                             link_v_mutex,
+                         const std::shared_ptr<std::timed_mutex>&
+                             body_v_mutex,
+                         const std::shared_ptr<std::timed_mutex>& file_mutex,
+                         std::ofstream& fout) {
+    std::cout << "Parser started to work" << std::endl;
+
+    body_v_mutex->lock();
+    BodyStruct input = vBody.front();
+    vBody.pop_back();
+    body_v_mutex->unlock();
+
+    std::string htmlSource = input.get_body();
+    int depth = input.get_depth();
 
     GumboOutput* parsedBody = gumbo_parse(htmlSource.c_str());
 
@@ -132,13 +152,20 @@ static void producer_fun(const std::string htmlSource, const int depth) {
         {
             GumboAttribute* href = nullptr;
             GumboAttribute* src = nullptr;
-            if (node->v.element.tag == GUMBO_TAG_A && (href =
+            if (depth > 1 && node->v.element.tag == GUMBO_TAG_A && (href =
                     gumbo_get_attribute(&node->v.element.attributes, "href"))) {
-                //vLinks.push_back(href->value); пихнуть ссылку в стек
+
+                link_v_mutex->lock();
+                vLinks.emplace_back(LinkStruct(
+                    href->value, depth - 1));  // пихнуть ссылку в стек
+                link_v_mutex->unlock();
             } else
                 if (node->v.element.tag == GUMBO_TAG_IMG && (src =
                      gumbo_get_attribute(&node->v.element.attributes, "src"))) {
-                    //std::cout << src->value << std::endl; записать ссыль на картинку
+
+                    file_mutex->lock();
+                    fout << src->value << std::endl; //записать в файл
+                    file_mutex->unlock();
                 }
 
             GumboVector* children = &node->v.element.children;
@@ -150,23 +177,4 @@ static void producer_fun(const std::string htmlSource, const int depth) {
     }
 
     gumbo_destroy_output(&kGumboDefaultOptions, parsedBody);
-    /*
-    if (node->type != GUMBO_NODE_ELEMENT || depth == 0) {
-        return;
-    }
-    GumboAttribute* href;
-    GumboAttribute* src;
-    if (node->v.element.tag == GUMBO_TAG_A &&
-          (href = gumbo_get_attribute(&node->v.element.attributes, "href"))) {
-        std::cout << href->value << std::endl;
-    } else
-        if (node->v.element.tag == GUMBO_TAG_IMG &&
-              (src = gumbo_get_attribute(&node->v.element.attributes, "src"))) {
-            std::cout << src->value << std::endl;
-    }
-
-    GumboVector* children = &node->v.element.children;
-    for (unsigned int i = 0; i < children->length; ++i) {
-        producer_fun(static_cast<GumboNode*>(children->data[i]), depth - 1);
-    }*/
 }

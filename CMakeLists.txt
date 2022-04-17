@@ -35,7 +35,7 @@ hunter_add_package(Beast)
 find_package(Beast CONFIG REQUIRED)
 
 hunter_add_package(OpenSSL)
-find_package(OpenSSL CONFIG REQUIRED)
+find_package(OpenSSL REQUIRED)
 
 hunter_add_package(Boost COMPONENTS system program_options)
 find_package(Boost CONFIG REQUIRED system program_options)

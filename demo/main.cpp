@@ -9,14 +9,12 @@
 #include <memory>
 #include <string>
 #include <thread>
-#include <gumbo.h>
+#include <boost/date_time/posix_time/posix_time.hpp>
 #include "../third-party/ThreadPool/ThreadPool.h"
 
 #include "consumer_producer.hpp"
 
 namespace po = boost::program_options;
-
-std::vector<LinkStruct> vLinks;
 
 int main(int argc, char* argv[]) {
     po::options_description opt_desc("Needed options");
@@ -37,20 +35,54 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    if (vm.count("url") && vm.count("depth") &&
+    if (!(vm.count("url") && vm.count("depth") &&
         vm.count("network_threads") && vm.count("parser_threads") &&
-        vm.count("output")) {
-        ThreadPool downloaders(vm["network_threads"].as<int>());
-        ThreadPool parsers(vm["parser_threads"].as<int>());
-    } else {
+        vm.count("output")))
+    {
         std::cout << opt_desc << "\n";
         return 1;
     }
 
+    ThreadPool downloaders(vm["network_threads"].as<int>());
+    ThreadPool parsers(vm["parser_threads"].as<int>());
+
+    std::vector<LinkStruct> vLinks;
+
+    std::vector<BodyStruct> vBody;
+
     LinkStruct head_link(vm["url"].as<std::string>(), vm["depth"].as<int>());
 
-    vLinks.push_back(vm["url"].as<std::string>());
+    vLinks.push_back(LinkStruct(vm["url"].as<std::string>(),
+                                vm["depth"].as<int>()));
 
+    std::shared_ptr<std::timed_mutex> link_v_mutex =
+                                      std::make_shared<std::timed_mutex>();
+    std::shared_ptr<std::timed_mutex> body_v_mutex =
+                                      std::make_shared<std::timed_mutex>();
+    std::shared_ptr<std::timed_mutex> file_mutex =
+                                      std::make_shared<std::timed_mutex>();
+
+    std::ofstream fout;
+    fout.open(vm["output"].as<std::string>());
+
+    boost::posix_time::ptime begin_time = boost::posix_time::microsec_clock::local_time();
+
+    while (!(vLinks.empty() && vBody.empty())) {
+        downloaders.enqueue([&vLinks, &vBody, &link_v_mutex, &body_v_mutex,
+          &file_mutex, &fout] {
+            downloader_fun(vLinks, vBody, link_v_mutex, body_v_mutex);
+        });
+
+        parsers.enqueue([&vLinks, &vBody, &link_v_mutex, &body_v_mutex,
+          &file_mutex, &fout] {
+            parser_fun(vLinks, vBody, link_v_mutex, body_v_mutex, file_mutex,
+                     fout);
+        });
+    }
+
+    std::cout << "Execution time: "
+              << boost::posix_time::microsec_clock::local_time() - begin_time
+              << std::endl;
 
     return 0;
 }
