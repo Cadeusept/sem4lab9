@@ -70,10 +70,15 @@ struct BodyStruct {
 
 [[maybe_unused]] void parser_fun(BodyStruct input,
                          std::queue<LinkStruct>& vLinks,
-                         const std::shared_ptr<std::timed_mutex>&
-                             link_v_mutex,
+                         const std::shared_ptr<std::timed_mutex>& link_v_mutex,
                          const std::shared_ptr<std::timed_mutex>& file_mutex,
                          size_t& in_process,
                          std::ofstream& fout);
+
+std::string download_http(std::string host, std::string port,
+                          const std::string& target);
+
+std::string download_https(std::string host, std::string port,
+                           const std::string& target);
 
 #endif // INCLUDE_EXAMPLE_HPP_

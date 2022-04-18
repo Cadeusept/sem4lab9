@@ -48,9 +48,6 @@ int main(int argc, char* argv[]) {
     vLinks.push(LinkStruct(vm["url"].as<std::string>(),
                                 vm["depth"].as<int>()));
 
-
-    int depth = vm["depth"].as<int>();
-
     std::shared_ptr<std::timed_mutex> link_v_mutex =
                                       std::make_shared<std::timed_mutex>();
     std::shared_ptr<std::timed_mutex> body_v_mutex =
@@ -75,16 +72,12 @@ int main(int argc, char* argv[]) {
             vLinks.pop();
             link_v_mutex->unlock();
 
-            if (data.get_depth() == depth) {
-                continue;
-            }
-
             in_process++;
-            downloaders.enqueue(downloader_fun, data, vBody, body_v_mutex);
+            //downloaders.enqueue(downloader_fun, data, vBody, body_v_mutex);
 
-            //downloaders.enqueue([data, &vBody, &link_v_mutex] {
-            //    downloader_fun(data, vBody, link_v_mutex);
-            //});
+            downloaders.enqueue([data, &vBody, &body_v_mutex] {
+                downloader_fun(data, vBody, body_v_mutex);
+            });
         }
 
         if (!vBody.empty()) {
@@ -93,23 +86,17 @@ int main(int argc, char* argv[]) {
             vBody.pop();
             body_v_mutex->unlock();
 
-            parsers.enqueue(parser_fun, data, vLinks, link_v_mutex,
-                            file_mutex, in_process, fout);
+            //parsers.enqueue(parser_fun, data, vLinks, link_v_mutex,
+            //                file_mutex, in_process, fout);
+
+            parsers.enqueue([data, &vLinks, &link_v_mutex, &file_mutex, &in_process, &fout] {
+                parser_fun(data, vLinks, link_v_mutex, file_mutex, in_process, fout);
+            });
         }
 
         if (in_process == 0 && vLinks.empty() && vBody.empty()) {
             break;
         }
-       /* if ( downloaded_num == 0)
-
-        });
-
-        if (parsed_num < downloaded_num && !vBody.empty())
-
-        });
-
-        if (vLinks.empty() && vBody.empty() &&
-           (downloaded_num - parsed_num == 0)) break; */
     }
     fout.close();
 

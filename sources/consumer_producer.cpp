@@ -17,81 +17,50 @@ namespace http = boost::beast::http;    // from <boost/beast/http.hpp>
 
     std::string url = input.get_url();
     int depth = input.get_depth();
+    bool flag = false;
 
     std::string output;
+    std::string port;
     try
     {
-        //auto port = "80";
-        //const int version = 11; //http version
-
         if (url.find("https://")) {
-            //port = "443";
+            port = "443";
             url = url.substr(9, url.length());
+            flag = true;
         } else if (url.find("http://")) {
-            //port = "80";
+            port = "80";
             url = url.substr(8, url.length());
+            flag = false;
         } else
             throw std::runtime_error("Wrong url");
-        auto const host = url.substr(0, url.find('/'));
-        auto const target = url.substr(url.find('/'), url.length());
 
-        //std::cout << host << " " << port << " " << target << " " << version << std::endl;
+        std::string host;
+        std::string target;
+        size_t protocol_len = 7;
 
-        //port = "443";
-        //version = 11;
-        boost::asio::io_context ioc;
-        ssl::context ctx{ ssl::context::sslv23_client };
-        load_root_certificates(ctx);
-        tcp::resolver resolver{ ioc };
-        ssl::stream<tcp::socket> stream{ ioc, ctx };
-        if (!SSL_set_tlsext_host_name(stream.native_handle(), host.c_str()))
-        {
-            boost::system::error_code ec{ static_cast<int>(::ERR_get_error()), boost::asio::error::get_ssl_category() };
-            throw boost::system::system_error{ ec };
+        if (url.find('/') != std::string::npos) {
+            host = url.substr(0, url.find('/'));
+            target = url.substr(url.find('/'),
+                                url.length() - protocol_len - url.find('/'));
+        } else {
+            host = url;
+            target = "/";
         }
 
-        auto const results = resolver.resolve(host, "443");
-        boost::asio::connect(stream.next_layer(), results.begin(), results.end());
-        stream.handshake(ssl::stream_base::client);
-
-        http::request<http::string_body> req{ http::verb::get, target, 11}; //11
-        req.set(http::field::host, "443");
-        req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
-
-        http::write(stream, req);
-        boost::beast::flat_buffer buffer;
-        http::response<boost::beast::http::string_body> res;
-
-        http::read(stream, buffer, res);
-
-
-        boost::system::error_code ec;
-        stream.shutdown(ec);
-
-        output = res.body();
-        if (ec == boost::asio::error::eof)
-        {
-            ec.assign(0, ec.category());
-        }
-        if (ec)
-            throw boost::system::system_error{ ec };
-
-        // If we get here then the connection is closed gracefully
+        if (flag)
+            output = download_https(host, port, target);
+        else
+            output = download_http(host, port, target);
+    } catch (std::exception const& e) {
+      std::cerr << "Error: " << e.what() << std::endl;
     }
-    catch (std::exception const& e)
-    {
-        std::cerr << "Error: " << e.what() << std::endl;
-    }
+
+    // запись html-страницы в поток вывода
     body_v_mutex->lock();
-    vBody.push(BodyStruct(output, depth)); // запись html-страницы в поток вывода
+    vBody.push(BodyStruct(output, depth));
     body_v_mutex->unlock();
     std::cout << "Downloader finished working" << std::endl;
 }
-
-
-
-
-
 
 
 [[maybe_unused]] void parser_fun(BodyStruct input,
@@ -147,3 +116,85 @@ namespace http = boost::beast::http;    // from <boost/beast/http.hpp>
     in_process--;
     std::cout << "Parser finished working" << std::endl;
 }
+
+std::string download_http(std::string host,
+                          std::string port,
+                          const std::string& target) {
+  boost::asio::io_context context;
+  tcp::resolver resolver{context};
+  tcp::socket socket{context};
+
+  auto const result = resolver.resolve(host, port);
+
+  boost::asio::connect(socket, result.begin(), result.end());
+
+  http::request<http::string_body> req{http::verb::get, target, 10};
+  req.set(http::field::host, host);
+  req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
+
+  http::write(socket, req);
+
+  boost::beast::flat_buffer buffer;
+  http::response<http::dynamic_body> res;
+  http::read(socket, buffer, res);
+
+  // Gracefully close the socket
+  boost::system::error_code ec;
+  socket.shutdown(tcp::socket::shutdown_both, ec);
+  return boost::beast::buffers_to_string(res.body().data());
+}
+
+std::string download_https(std::string host,
+                           std::string port,
+                           const std::string& target) {
+  // The io_context is required for all I/O
+  boost::asio::io_context context;
+
+  // The SSL context is required, and holds certificates
+  ssl::context ssl_context{ssl::context::sslv23_client};
+
+  // This holds the root certificate used for verification
+  boost::system::error_code ssl_ec;
+  load_root_certificates(ssl_context, ssl_ec);
+  if (ssl_ec) {
+    throw(std::runtime_error(ssl_ec.message()));
+  }
+
+  // These objects perform our I/O
+  tcp::resolver resolver{context};
+  ssl::stream<tcp::socket> stream{context, ssl_context};
+
+  // Look up the domain name
+  auto const results = resolver.resolve(host, port);
+
+  // Make the connection on the IP address we get from a lookup
+  boost::asio::connect(stream.next_layer(), results.begin(), results.end());
+
+  // Perform the SSL handshake
+  stream.handshake(ssl::stream_base::client);
+
+  // Set up an HTTP GET request message
+  http::request<http::string_body> req{http::verb::get, target, 10};
+  req.set(http::field::host, host);
+  req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
+
+  // Send the HTTP request to the remote host
+  http::write(stream, req);
+
+  // This buffer is used for reading and must be persisted
+  boost::beast::flat_buffer buffer;
+
+  // Declare a container to hold the response
+  http::response<http::dynamic_body> res;
+
+  // Receive the HTTP response
+  http::read(stream, buffer, res);
+
+  // Gracefully close the stream
+  boost::system::error_code ec;
+  stream.shutdown(ec);
+
+  return boost::beast::buffers_to_string(res.body().data());
+}
+
+
