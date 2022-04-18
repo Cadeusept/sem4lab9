@@ -2,6 +2,7 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <thread>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include "../third-party/ThreadPool/ThreadPool.h"
 
@@ -14,7 +15,8 @@ int main(int argc, char* argv[]) {
     opt_desc.add_options()
         ("url", po::value<std::string>(), "set website url for parsing, ")
         ("depth", po::value<int>(), "set website parsing depth")
-        ("network_threads", po::value<int>(), "set number of downloading threads")
+        ("network_threads", po::value<int>(),
+            "set number of downloading threads")
         ("parser_threads", po::value<int>(), "set number of parsing threads")
         ("output", po::value<std::string>(), "set output file path")
     ;
@@ -34,7 +36,12 @@ int main(int argc, char* argv[]) {
     {
         std::cout << opt_desc << "\n";
         return 1;
-    }
+    } else if ((unsigned int)abs(vm["network_threads"].as<int>() +
+               vm["parser_threads"].as<int>()) >
+               std::thread::hardware_concurrency())
+        std::cout << "Max sum of threads is " <<
+          std::thread::hardware_concurrency() <<
+          ". Rerun program with valid data"   << std::endl;
 
     ThreadPool downloaders(vm["network_threads"].as<int>());
     ThreadPool parsers(vm["parser_threads"].as<int>());
@@ -89,8 +96,10 @@ int main(int argc, char* argv[]) {
             //parsers.enqueue(parser_fun, data, vLinks, link_v_mutex,
             //                file_mutex, in_process, fout);
 
-            parsers.enqueue([data, &vLinks, &link_v_mutex, &file_mutex, &in_process, &fout] {
-                parser_fun(data, vLinks, link_v_mutex, file_mutex, in_process, fout);
+            parsers.enqueue([data, &vLinks, &link_v_mutex, &file_mutex,
+                             &in_process, &fout] {
+                parser_fun(data, vLinks, link_v_mutex, file_mutex,
+                         in_process, fout);
             });
         }
 
