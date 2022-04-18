@@ -48,7 +48,7 @@ add_library(${PROJECT_NAME} STATIC
         ${CMAKE_CURRENT_SOURCE_DIR}/sources/consumer_producer.cpp
 )
 
-add_executable(demo
+add_executable(parser
   ${CMAKE_CURRENT_SOURCE_DIR}/demo/main.cpp
 )
 
@@ -66,7 +66,7 @@ target_link_libraries(${PROJECT_NAME}
         OpenSSL::Crypto
         )
 
-target_link_libraries(demo ${PROJECT_NAME})
+target_link_libraries(parser ${PROJECT_NAME})
 
 if(BUILD_TESTS)
   add_executable(tests
@@ -101,7 +101,7 @@ endif()
 
 include(CPackConfig.cmake)
 
-install(TARGETS ${PROJECT_NAME} demo
+install(TARGETS ${PROJECT_NAME} parser
   EXPORT "${PROJECT_NAME}-targets"
   RUNTIME DESTINATION bin
   ARCHIVE DESTINATION lib
