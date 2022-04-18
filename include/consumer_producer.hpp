@@ -73,7 +73,7 @@ struct BodyStruct {
                          const std::shared_ptr<std::timed_mutex>&
                              link_v_mutex,
                          const std::shared_ptr<std::timed_mutex>& file_mutex,
-                         size_t* parsed_num,
+                         size_t& in_process,
                          std::ofstream& fout);
 
 #endif // INCLUDE_EXAMPLE_HPP_

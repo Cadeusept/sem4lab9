@@ -98,7 +98,7 @@ namespace http = boost::beast::http;    // from <boost/beast/http.hpp>
                          std::queue<LinkStruct>& vLinks,
                          const std::shared_ptr<std::timed_mutex>& link_v_mutex,
                          const std::shared_ptr<std::timed_mutex>& file_mutex,
-                         size_t* in_progress,
+                         size_t& in_process,
                          std::ofstream& fout) {
     std::cout << "Parser started to work" << std::endl;
 
@@ -144,6 +144,6 @@ namespace http = boost::beast::http;    // from <boost/beast/http.hpp>
     }
 
     gumbo_destroy_output(&kGumboDefaultOptions, parsedBody);
-    (*in_progress)--;
+    in_process--;
     std::cout << "Parser finished working" << std::endl;
 }

@@ -64,7 +64,7 @@ int main(int argc, char* argv[]) {
     boost::posix_time::ptime begin_time =
         boost::posix_time::microsec_clock::local_time();
 
-    short in_process = 0;
+    size_t in_process = 0;
 
     std::cout << "Began working" << std::endl;
 
@@ -80,11 +80,11 @@ int main(int argc, char* argv[]) {
             }
 
             in_process++;
-            //downloaders.enqueue(downloader_fun, data, vBody, body_v_mutex);
+            downloaders.enqueue(downloader_fun, data, vBody, body_v_mutex);
 
-            downloaders.enqueue([data, &vBody, &link_v_mutex] {
-                downloader_fun(data, vBody, link_v_mutex);
-            });
+            //downloaders.enqueue([data, &vBody, &link_v_mutex] {
+            //    downloader_fun(data, vBody, link_v_mutex);
+            //});
         }
 
         if (!vBody.empty()) {
@@ -93,8 +93,8 @@ int main(int argc, char* argv[]) {
             vBody.pop();
             body_v_mutex->unlock();
 
-            parsers.enqueue(parser_fun, data, vLinks, link_v_mutex, file_mutex,
-                         in_process, fout);
+            parsers.enqueue(parser_fun, data, vLinks, link_v_mutex,
+                            file_mutex, in_process, fout);
         }
 
         if (in_process == 0 && vLinks.empty() && vBody.empty()) {
