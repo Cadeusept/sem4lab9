@@ -4,8 +4,8 @@
 
 #include <gtest/gtest.h>
 
-#include <example.hpp>
+#include <consumer_producer.hpp>
 
 TEST(Example, EmptyTest) {
-    EXPECT_THROW(example(), std::runtime_error);
+    ASSERT_EQ(1, 1);
 }
