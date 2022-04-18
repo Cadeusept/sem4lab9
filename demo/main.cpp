@@ -48,6 +48,9 @@ int main(int argc, char* argv[]) {
     vLinks.push(LinkStruct(vm["url"].as<std::string>(),
                                 vm["depth"].as<int>()));
 
+
+    int depth = vm["depth"].as<int>();
+
     std::shared_ptr<std::timed_mutex> link_v_mutex =
                                       std::make_shared<std::timed_mutex>();
     std::shared_ptr<std::timed_mutex> body_v_mutex =
@@ -61,30 +64,53 @@ int main(int argc, char* argv[]) {
     boost::posix_time::ptime begin_time =
         boost::posix_time::microsec_clock::local_time();
 
-    short downloaded_num = 0;
-    short parsed_num = 0;
+    short in_process = 0;
 
     std::cout << "Began working" << std::endl;
 
-    while (1) {
-        if ( downloaded_num == 0)
-        downloaders.enqueue([&vLinks, &vBody, &link_v_mutex, &body_v_mutex,
-                           &downloaded_num] {
-            downloader_fun(vLinks, vBody, link_v_mutex, body_v_mutex,
-                       downloaded_num);
+    while (true) {
+        if (!vLinks.empty()) {
+            link_v_mutex->lock();
+            LinkStruct data = vLinks.front();
+            vLinks.pop();
+            link_v_mutex->unlock();
+
+            if (data.get_depth() == depth) {
+                continue;
+            }
+
+            in_process++;
+            //downloaders.enqueue(downloader_fun, data, vBody, body_v_mutex);
+
+            downloaders.enqueue([data, &vBody, &link_v_mutex] {
+                downloader_fun(data, vBody, link_v_mutex);
+            });
+        }
+
+        if (!vBody.empty()) {
+            body_v_mutex->lock();
+            BodyStruct data = vBody.front();
+            vBody.pop();
+            body_v_mutex->unlock();
+
+            parsers.enqueue(parser_fun, data, vLinks, link_v_mutex, file_mutex,
+                         in_process, fout);
+        }
+
+        if (in_process == 0 && vLinks.empty() && vBody.empty()) {
+            break;
+        }
+       /* if ( downloaded_num == 0)
+
         });
 
         if (parsed_num < downloaded_num && !vBody.empty())
-        parsers.enqueue([&vLinks, &vBody, &link_v_mutex, &body_v_mutex,
-          &file_mutex, &parsed_num, &fout] {
-            parser_fun(vLinks, vBody, link_v_mutex, body_v_mutex, file_mutex,
-                     parsed_num, fout);
+
         });
 
         if (vLinks.empty() && vBody.empty() &&
-           (downloaded_num - parsed_num == 0)) break;
+           (downloaded_num - parsed_num == 0)) break; */
     }
-
     fout.close();
 
     std::cout << "Execution time: "

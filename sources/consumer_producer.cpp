@@ -9,20 +9,11 @@ namespace ssl = boost::asio::ssl;       // from <boost/asio/ssl.hpp>
 namespace http = boost::beast::http;    // from <boost/beast/http.hpp>
 
 // Performs an HTTP GET and prints the response
-[[maybe_unused]] void downloader_fun(std::queue<LinkStruct>& vLinks,
+[[maybe_unused]] void downloader_fun(LinkStruct input,
                          std::queue<BodyStruct>& vBody,
-                         const std::shared_ptr<std::timed_mutex>&
-                             link_v_mutex,
-                         const std::shared_ptr<std::timed_mutex>&
-                             body_v_mutex,
-                         short& downloaded_num)
+                         const std::shared_ptr<std::timed_mutex>& body_v_mutex)
 {
     std::cout << "Downloader started to work" << std::endl;
-
-    link_v_mutex->lock();
-    LinkStruct input = vLinks.front();
-    vLinks.pop();
-    link_v_mutex->unlock();
 
     std::string url = input.get_url();
     int depth = input.get_depth();
@@ -95,7 +86,6 @@ namespace http = boost::beast::http;    // from <boost/beast/http.hpp>
     vBody.push(BodyStruct(output, depth)); // запись html-страницы в поток вывода
     body_v_mutex->unlock();
     std::cout << "Downloader finished working" << std::endl;
-    downloaded_num++;
 }
 
 
@@ -104,21 +94,13 @@ namespace http = boost::beast::http;    // from <boost/beast/http.hpp>
 
 
 
-[[maybe_unused]] void parser_fun(std::queue<LinkStruct>& vLinks,
-                         std::queue<BodyStruct>& vBody,
-                         const std::shared_ptr<std::timed_mutex>&
-                             link_v_mutex,
-                         const std::shared_ptr<std::timed_mutex>&
-                             body_v_mutex,
+[[maybe_unused]] void parser_fun(BodyStruct input,
+                         std::queue<LinkStruct>& vLinks,
+                         const std::shared_ptr<std::timed_mutex>& link_v_mutex,
                          const std::shared_ptr<std::timed_mutex>& file_mutex,
-                         short& parsed_num,
+                         size_t* in_progress,
                          std::ofstream& fout) {
     std::cout << "Parser started to work" << std::endl;
-
-    body_v_mutex->lock();
-    BodyStruct input = vBody.front();
-    vBody.pop();
-    body_v_mutex->unlock();
 
     std::string htmlSource = input.get_body();
     int depth = input.get_depth();
@@ -162,6 +144,6 @@ namespace http = boost::beast::http;    // from <boost/beast/http.hpp>
     }
 
     gumbo_destroy_output(&kGumboDefaultOptions, parsedBody);
-    parsed_num++;
+    (*in_progress)--;
     std::cout << "Parser finished working" << std::endl;
 }

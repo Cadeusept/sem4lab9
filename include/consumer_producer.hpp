@@ -64,22 +64,16 @@ struct BodyStruct {
     }
 };
 
-[[maybe_unused]] void downloader_fun(std::queue<LinkStruct>& vLinks,
+[[maybe_unused]] void downloader_fun(LinkStruct input,
                          std::queue<BodyStruct>& vBody,
-                         const std::shared_ptr<std::timed_mutex>&
-                             link_v_mutex,
-                         const std::shared_ptr<std::timed_mutex>&
-                             body_v_mutex,
-                         short& downloaded_num);
+                         const std::shared_ptr<std::timed_mutex>& body_v_mutex);
 
-[[maybe_unused]] void parser_fun(std::queue<LinkStruct>& vLinks,
-                         std::queue<BodyStruct>& vBody,
+[[maybe_unused]] void parser_fun(BodyStruct input,
+                         std::queue<LinkStruct>& vLinks,
                          const std::shared_ptr<std::timed_mutex>&
                              link_v_mutex,
-                         const std::shared_ptr<std::timed_mutex>&
-                             body_v_mutex,
                          const std::shared_ptr<std::timed_mutex>& file_mutex,
-                         short& parsed_num,
+                         size_t* parsed_num,
                          std::ofstream& fout);
 
 #endif // INCLUDE_EXAMPLE_HPP_
