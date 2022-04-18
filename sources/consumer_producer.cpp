@@ -31,8 +31,9 @@ namespace http = boost::beast::http;    // from <boost/beast/http.hpp>
             port = "80";
             url = url.substr(8, url.length());
             flag = false;
-        } else
+        } else {
             throw std::runtime_error("Wrong url");
+        }
 
         std::string host;
         std::string target;
@@ -90,20 +91,19 @@ namespace http = boost::beast::http;    // from <boost/beast/http.hpp>
             GumboAttribute* src = nullptr;
             if (depth > 1 && node->v.element.tag == GUMBO_TAG_A && (href =
                     gumbo_get_attribute(&node->v.element.attributes, "href"))) {
-
                 link_v_mutex->lock();
                 vLinks.push(LinkStruct(
                     href->value, depth - 1));  // пихнуть ссылку в стек
                 link_v_mutex->unlock();
-            } else
-                if (node->v.element.tag == GUMBO_TAG_IMG && (src =
-                     gumbo_get_attribute(&node->v.element.attributes, "src"))) {
-
+            } else {
+                if (node->v.element.tag == GUMBO_TAG_IMG &&
+                        (src = gumbo_get_attribute(&node->v.element.attributes,
+                                             "src"))) {
                     file_mutex->lock();
-                    fout << src->value << std::endl; //записать в файл
+                    fout << src->value << std::endl;  // записать в файл
                     file_mutex->unlock();
                 }
-
+            }
             GumboVector* children = &node->v.element.children;
             for (unsigned int i = 0; i < children->length; ++i)
             {
