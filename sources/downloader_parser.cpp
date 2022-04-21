@@ -1,6 +1,6 @@
 // Copyright 2021 Your Name <your_email>
 
-#include <consumer_producer.hpp>
+#include <downloader_parser.hpp>
 #include <queue>
 #include <stdexcept>
 
@@ -11,9 +11,14 @@ namespace http = boost::beast::http;    // from <boost/beast/http.hpp>
 // Performs an HTTP GET and prints the response
 [[maybe_unused]] void downloader_fun(LinkStruct input,
                          std::queue<BodyStruct>& vBody,
-                         const std::shared_ptr<std::timed_mutex>& body_v_mutex)
+                         const std::shared_ptr<std::timed_mutex>& body_v_mutex,
+                         const std::shared_ptr<std::timed_mutex>& console_mutex,
+                         size_t& in_process)
 {
-    std::cout << "Downloader started to work" << std::endl;
+    console_mutex->lock();
+    std::cout << "Downloader started to work, links in process: "
+              << in_process << ". url: " << input.get_url() << std::endl;
+    console_mutex->unlock();
 
     std::string url = input.get_url();
     int depth = input.get_depth();
@@ -32,7 +37,13 @@ namespace http = boost::beast::http;    // from <boost/beast/http.hpp>
             url = url.substr(8, url.length());
             flag = false;
         } else {
-            throw std::runtime_error("Wrong url");
+            console_mutex->lock();
+            std::cerr << "Error: " << "Wrong url" << std::endl;
+            std::cout << "Downloader finished working, links in process: "
+                  << in_process - 1 << std::endl;
+            in_process--;
+            console_mutex->unlock();
+        return;
         }
 
         std::string host;
@@ -53,14 +64,24 @@ namespace http = boost::beast::http;    // from <boost/beast/http.hpp>
         else
             output = download_http(host, port, target);
     } catch (std::exception const& e) {
-      std::cerr << "Error: " << e.what() << std::endl;
+        console_mutex->lock();
+        std::cerr << "Error: " << e.what() << std::endl;
+        std::cout << "Downloader finished working, links in process: "
+                  << in_process - 1 << std::endl;
+        in_process--;
+        console_mutex->unlock();
+        return;
     }
 
     // запись html-страницы в поток вывода
     body_v_mutex->lock();
     vBody.push(BodyStruct(output, depth));
     body_v_mutex->unlock();
-    std::cout << "Downloader finished working" << std::endl;
+
+    console_mutex->lock();
+    std::cout << "Downloader finished working, links in process: "
+              << in_process << std::endl;
+    console_mutex->unlock();
 }
 
 
@@ -68,9 +89,17 @@ namespace http = boost::beast::http;    // from <boost/beast/http.hpp>
                          std::queue<LinkStruct>& vLinks,
                          const std::shared_ptr<std::timed_mutex>& link_v_mutex,
                          const std::shared_ptr<std::timed_mutex>& file_mutex,
+                         const std::shared_ptr<std::timed_mutex>& console_mutex,
                          size_t& in_process,
-                         std::ofstream& fout) {
-    std::cout << "Parser started to work" << std::endl;
+                         std::ofstream& fout)
+{
+    if (in_process == 0)
+        return;
+
+    console_mutex->lock();
+    std::cout << "Parser started to work, links in process: "
+              << in_process << std::endl;
+    console_mutex->unlock();
 
     std::string htmlSource = input.get_body();
     int depth = input.get_depth();
@@ -113,8 +142,15 @@ namespace http = boost::beast::http;    // from <boost/beast/http.hpp>
     }
 
     gumbo_destroy_output(&kGumboDefaultOptions, parsedBody);
+
+    if (in_process == 0)
+        return;
+
+    console_mutex->lock();
+    std::cout << "Parser finished working, links in process: "
+              << in_process - 1 << std::endl;
     in_process--;
-    std::cout << "Parser finished working" << std::endl;
+    console_mutex->unlock();
 }
 
 std::string download_http(std::string host,

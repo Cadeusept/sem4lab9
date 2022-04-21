@@ -67,12 +67,15 @@ struct BodyStruct {
 
 [[maybe_unused]] void downloader_fun(LinkStruct input,
                          std::queue<BodyStruct>& vBody,
-                         const std::shared_ptr<std::timed_mutex>& body_v_mutex);
+                         const std::shared_ptr<std::timed_mutex>& body_v_mutex,
+                         const std::shared_ptr<std::timed_mutex>& console_mutex,
+                         size_t& in_process);
 
 [[maybe_unused]] void parser_fun(BodyStruct input,
                          std::queue<LinkStruct>& vLinks,
                          const std::shared_ptr<std::timed_mutex>& link_v_mutex,
                          const std::shared_ptr<std::timed_mutex>& file_mutex,
+                         const std::shared_ptr<std::timed_mutex>& console_mutex,
                          size_t& in_process,
                          std::ofstream& fout);
 

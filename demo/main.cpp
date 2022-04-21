@@ -1,12 +1,12 @@
+#include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/program_options.hpp>
 #include <iostream>
 #include <memory>
 #include <string>
 #include <thread>
-#include <boost/date_time/posix_time/posix_time.hpp>
-#include "../third-party/ThreadPool/ThreadPool.h"
 
-#include "consumer_producer.hpp"
+#include "../third-party/ThreadPool/ThreadPool.h"
+#include "downloader_parser.hpp"
 
 namespace po = boost::program_options;
 
@@ -61,6 +61,8 @@ int main(int argc, char* argv[]) {
                                       std::make_shared<std::timed_mutex>();
     std::shared_ptr<std::timed_mutex> file_mutex =
                                       std::make_shared<std::timed_mutex>();
+    std::shared_ptr<std::timed_mutex> console_mutex =
+                                      std::make_shared<std::timed_mutex>();
 
     std::ofstream fout;
     fout.open(vm["output"].as<std::string>());
@@ -70,7 +72,9 @@ int main(int argc, char* argv[]) {
 
     size_t in_process = 0;
 
+    console_mutex->lock();
     std::cout << "Began working" << std::endl;
+    console_mutex->unlock();
 
     while (true) {
         if (!vLinks.empty()) {
@@ -79,11 +83,14 @@ int main(int argc, char* argv[]) {
             vLinks.pop();
             link_v_mutex->unlock();
 
+            console_mutex->lock();
             in_process++;
-            //downloaders.enqueue(downloader_fun, data, vBody, body_v_mutex);
+            console_mutex->unlock();
 
-            downloaders.enqueue([data, &vBody, &body_v_mutex] {
-                downloader_fun(data, vBody, body_v_mutex);
+            downloaders.enqueue([data, &vBody, &body_v_mutex, &console_mutex,
+                                 &in_process] {
+                downloader_fun(data, vBody, body_v_mutex, console_mutex,
+                             in_process);
             });
         }
 
@@ -93,13 +100,10 @@ int main(int argc, char* argv[]) {
             vBody.pop();
             body_v_mutex->unlock();
 
-            //parsers.enqueue(parser_fun, data, vLinks, link_v_mutex,
-            //                file_mutex, in_process, fout);
-
             parsers.enqueue([data, &vLinks, &link_v_mutex, &file_mutex,
-                             &in_process, &fout] {
+                             &console_mutex, &in_process, &fout] {
                 parser_fun(data, vLinks, link_v_mutex, file_mutex,
-                         in_process, fout);
+                         console_mutex, in_process, fout);
             });
         }
 
@@ -109,9 +113,10 @@ int main(int argc, char* argv[]) {
     }
     fout.close();
 
+    console_mutex->lock();
     std::cout << "Execution time: "
               << boost::posix_time::microsec_clock::local_time() - begin_time
               << std::endl;
-
+    console_mutex->unlock();
     return 0;
 }
