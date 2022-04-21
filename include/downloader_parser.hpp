@@ -1,7 +1,7 @@
 // Copyright 2021 Your Name <your_email>
 
-#ifndef INCLUDE_CONSUMER_PRODUCER_HPP_
-#define INCLUDE_CONSUMER_PRODUCER_HPP_
+#ifndef INCLUDE_DOWNLOADER_PARSER_HPP_
+#define INCLUDE_DOWNLOADER_PARSER_HPP_
 
 #include "../third-party/root_certificates.hpp"
 #include <boost/asio/ip/tcp.hpp>
@@ -85,4 +85,4 @@ std::string download_http(std::string host, std::string port,
 std::string download_https(std::string host, std::string port,
                            const std::string& target);
 
-#endif // INCLUDE_CONSUMER_PRODUCER_HPP_
+#endif // INCLUDE_DOWNLOADER_PARSER_HPP_
